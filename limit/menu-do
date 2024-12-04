@@ -1,0 +1,188 @@
+#!/bin/bash
+
+# Fungsi untuk meminta pengguna memasukkan token DigitalOcean
+enter_token() {
+    read -p "Masukkan token DigitalOcean Anda: " TOKEN
+}
+
+# Memeriksa apakah token telah disimpan sebelumnya
+if [ -z "$TOKEN" ]; then
+    enter_token
+fi
+
+# Fungsi untuk menampilkan menu
+show_menu() {
+    echo "Menu:"
+    echo "1. Lihat daftar ID VPS"
+    echo "2. Rebuild VPS"
+    echo "3. Hapus VPS"
+    echo "4. Buat VPS"
+    echo "5. Keluar"
+}
+
+# Fungsi untuk menampilkan daftar ID VPS
+list_droplets() {
+    echo "Daftar ID VPS:"
+    droplets=$(curl -s -X GET -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" "https://api.digitalocean.com/v2/droplets")
+    echo "$droplets" | jq -r '.droplets[] | "\(.id) - \(.name)"'
+}
+
+# Fungsi untuk melakukan rebuild VPS
+rebuild_droplet() {
+    list_droplets
+    read -p "Masukkan ID VPS yang ingin direbuild: " DROPLET_ID
+    # Mendapatkan informasi tentang Droplet yang dipilih
+    droplet_info=$(echo "$droplets" | jq -r --arg DROPLET_ID "$DROPLET_ID" '.droplets[] | select(.id == $DROPLET_ID)')
+    droplet_name=$(echo "$droplet_info" | jq -r '.name')
+
+    echo "Informasi Droplet: $droplet_info"
+
+    # Mendapatkan sistem operasi Droplet
+    os_slug=$(echo "$droplet_info" | jq -r '.image.slug')
+    echo "Slug sistem operasi Droplet: $os_slug"
+
+    # Mendapatkan daftar gambar dengan distribusi Ubuntu atau Debian
+    echo "Daftar Gambar:"
+    images=$(curl -s -X GET -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" "https://api.digitalocean.com/v2/images?type=distribution")
+    filtered_images=$(echo "$images" | jq -r '.images[] | select(.distribution == "Ubuntu" or .distribution == "Debian") | {id: .id, name: .name, distribution: .distribution, slug: .slug}')
+    echo "$filtered_images" | jq '.'
+
+    # Meminta pengguna untuk memilih gambar
+    echo "ubuntu 20 id : 112929454"
+    echo "debian 10 id : 106569146"
+    read -p "Masukkan ID gambar yang ingin digunakan untuk rebuild: " IMAGE_ID
+
+    # Menjalankan proses rebuild dengan gambar yang dipilih
+    echo "Mereset (rebuilding) VPS dengan gambar yang dipilih..."
+    rebuild_response=$(curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d '{"type":"rebuild","image":"'"$IMAGE_ID"'"}' "https://api.digitalocean.com/v2/droplets/$DROPLET_ID/actions")
+
+    # Menunggu proses rebuild selesai
+    echo "Menunggu proses rebuild selesai..."
+    rebuild_status=$(echo "$rebuild_response" | jq -r '.action.status')
+    while [ "$rebuild_status" != "completed" ]; do
+        sleep 5
+        rebuild_response=$(curl -s -X GET -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" "https://api.digitalocean.com/v2/droplets/$DROPLET_ID/actions")
+        rebuild_status=$(echo "$rebuild_response" | jq -r '.action.status')
+    done
+
+    # Mendapatkan kata sandi baru dari email konfirmasi
+    echo "Menunggu konfirmasi email untuk mendapatkan kata sandi baru..."
+    echo "Pastikan Anda telah memeriksa email Anda."
+
+    # Menampilkan kata sandi baru
+    echo "Kata sandi baru untuk Droplet $droplet_name: [PASSWORD_HERE]"
+}
+
+# Fungsi untuk menghapus VPS (droplet)
+delete_droplet() {
+    list_droplets
+    read -p "Masukkan ID VPS yang ingin dihapus: " DROPLET_ID
+
+    # Melakukan konfirmasi pengguna sebelum menghapus
+    read -p "Apakah Anda yakin ingin menghapus VPS dengan ID $DROPLET_ID? (y/n): " confirm_delete
+    if [ "$confirm_delete" == "y" ]; then
+        # Menghapus VPS dengan menggunakan ID yang diberikan
+        echo "Menghapus VPS..."
+        delete_response=$(curl -s -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" "https://api.digitalocean.com/v2/droplets/$DROPLET_ID")
+        echo "VPS telah berhasil dihapus."
+    else
+        echo "Penghapusan VPS dibatalkan."
+    fi
+}
+
+# Fungsi untuk membuat VPS (droplet)
+create_droplet() {
+    # Menampilkan daftar region yang tersedia
+    echo "Daftar Region yang Tersedia:"
+    regions=$(curl -s -X GET -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" "https://api.digitalocean.com/v2/regions")
+    echo "$regions" | jq -r '.regions[] | .slug + " - " + .name'
+
+    # Meminta pengguna untuk memilih region
+    read -p "Masukkan slug region yang ingin digunakan untuk membuat VPS: " REGION_SLUG
+
+    # Menampilkan daftar size yang tersedia
+    echo "Daftar Size yang Tersedia:"
+    echo "s-1vcpu-512mb-10gb - 512MB RAM, 1 vCPUs"
+    echo "s-1vcpu-1gb - 1024MB RAM, 1 vCPUs"
+    echo "s-1vcpu-1gb-amd - 1024MB RAM, 1 vCPUs"
+    echo "s-1vcpu-1gb-intel - 1024MB RAM, 1 vCPUs"
+    echo "s-1vcpu-1gb-35gb-intel - 1024MB RAM, 1 vCPUs"
+    echo "s-1vcpu-2gb - 2048MB RAM, 1 vCPUs"
+    echo "s-1vcpu-2gb-amd - 2048MB RAM, 1 vCPUs"
+    echo "s-1vcpu-2gb-intel - 2048MB RAM, 1 vCPUs"
+    echo "s-1vcpu-2gb-70gb-intel - 2048MB RAM, 1 vCPUs"
+    echo "s-2vcpu-2gb - 2048MB RAM, 2 vCPUs"
+    echo "s-2vcpu-2gb-amd - 2048MB RAM, 2 vCPUs"
+    echo "s-2vcpu-2gb-intel - 2048MB RAM, 2 vCPUs"
+    echo "s-2vcpu-2gb-90gb-intel - 2048MB RAM, 2 vCPUs"
+    echo "s-2vcpu-4gb - 4096MB RAM, 2 vCPUs"
+    echo "s-2vcpu-4gb-amd - 4096MB RAM, 2 vCPUs"
+    echo "s-2vcpu-4gb-intel - 4096MB RAM, 2 vCPUs"
+    echo "s-2vcpu-4gb-120gb-intel - 4096MB RAM, 2 vCPUs"
+    echo "s-2vcpu-8gb-amd - 8192MB RAM, 2 vCPUs"
+    # Meminta pengguna untuk memilih size
+    read -p "Masukkan slug size yang inginkan contoh s-1vcpu-1gb : " SIZE_SLUG
+
+    # Menampilkan daftar image yang tersedia
+    echo "Daftar Image yang Tersedia:"
+    images=$(curl -s -X GET -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" "https://api.digitalocean.com/v2/images?type=distribution")
+    filtered_images=$(echo "$images" | jq -r '.images[] | select(.distribution == "Ubuntu" or .distribution == "Debian") | {id: .id, name: .name, distribution: .distribution, slug: .slug}')
+    echo "$filtered_images" | jq '.'
+
+    # Meminta pengguna untuk memilih image
+    echo "Contoh: ubuntu 20 id : 112929454, debian 10 id : 106569146"
+    read -p "Masukkan ID image yang ingin digunakan untuk membuat VPS: " IMAGE_ID
+    read -p "Masukan sandi : " password
+
+    # Menjalankan proses pembuatan droplet
+    # Menjalankan proses pembuatan droplet
+    echo "Membuat VPS..."
+create_response=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d '{"name":"My-Droplet","region":"'"$REGION_SLUG"'","size":"'"$SIZE_SLUG"'","image":"'"$IMAGE_ID"'","root_password":"'"$password"'"}' \
+    "https://api.digitalocean.com/v2/droplets")
+
+    # Mendapatkan ID VPS yang baru dibuat
+    DROPLET_ID=$(echo "$create_response" | jq -r '.droplet.id')
+
+    # Menunggu proses pembuatan selesai
+    echo "Menunggu proses pembuatan selesai..."
+    while true; do
+        status=$(curl -s -X GET -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" "https://api.digitalocean.com/v2/droplets/$DROPLET_ID" | jq -r '.droplet.status')
+        if [ "$status" == "active" ]; then
+            break
+        fi
+        sleep 5
+    done
+
+    # Mendapatkan informasi VPS yang berhasil dibuat
+    droplet_info=$(curl -s -X GET -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" "https://api.digitalocean.com/v2/droplets/$DROPLET_ID" | jq -r '.droplet')
+    droplet_name=$(echo "$droplet_info" | jq -r '.name')
+    droplet_ip=$(echo "$droplet_info" | jq -r '.networks.v4[0].ip_address')
+
+    # Menampilkan informasi VPS
+    echo "VPS telah berhasil dibuat!"
+    echo "Informasi VPS:"
+    echo "Nama: $droplet_name"
+    echo "IP: $droplet_ip"
+    echo "Kata Sandi: $password"  # Menampilkan kata sandi acak
+}
+
+# Menampilkan menu awal
+show_menu
+
+# Loop untuk meminta input pengguna
+while true; do
+    read -p "Pilih tindakan yang ingin dilakukan (1/2/3/4/5): " choice
+    case $choice in
+        1) list_droplets ;;
+        2) rebuild_droplet ;;
+        3) delete_droplet ;;
+        4) create_droplet ;;
+        5) echo "Terima kasih! Sampai jumpa."; exit ;;
+        *) echo "Pilihan tidak valid. Silakan pilih antara 1, 2, 3, 4 ,5." ;;
+    esac
+    echo
+    show_menu
+done
