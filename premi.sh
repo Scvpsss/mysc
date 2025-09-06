@@ -48,12 +48,33 @@ else
 fi
 
 # // Checking System
-if [[ $( cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g' ) == "ubuntu" ]]; then
-    echo -e "${OK} Your OS Is Supported ( ${green}$( cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g' )${NC} )"
-elif [[ $( cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g' ) == "debian" ]]; then
-    echo -e "${OK} Your OS Is Supported ( ${green}$( cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g' )${NC} )"
+os_id=$(grep -w ID /etc/os-release | head -n1 | cut -d= -f2 | tr -d '"')
+os_version=$(grep -w VERSION_ID /etc/os-release | head -n1 | cut -d= -f2 | tr -d '"')
+
+if [[ "$os_id" == "ubuntu" ]]; then
+    case "$os_version" in
+        20.04|22.04|24.04)
+            echo -e "${OK} Your OS Is Supported (Ubuntu $os_version)"
+            ;;
+        *)
+            echo -e "${EROR} Ubuntu version $os_version not supported"
+            exit 1
+            ;;
+    esac
+
+elif [[ "$os_id" == "debian" ]]; then
+    case "$os_version" in
+        10|12)
+            echo -e "${OK} Your OS Is Supported (Debian $os_version)"
+            ;;
+        *)
+            echo -e "${EROR} Debian version $os_version not supported"
+            exit 1
+            ;;
+    esac
+
 else
-    echo -e "${EROR} Your OS Is Not Supported ( ${YELLOW}$( cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g' )${NC} )"
+    echo -e "${EROR} Your OS ($os_id $os_version) is not supported"
     exit 1
 fi
 
