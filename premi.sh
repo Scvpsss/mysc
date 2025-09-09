@@ -36,7 +36,6 @@ echo -e " © Recode By My Self Bayu Tunneling${YELLOW}(${NC} 2023 ${YELLOW})${NC
 echo -e "${YELLOW}----------------------------------------------------------${NC}"
 echo ""
 sleep 2
-###### IZIN SC 
 
 # ==============================
 #  UNIVERSAL BASE INSTALLER
@@ -55,18 +54,14 @@ echo -e "${green}[INFO]${FONT} Deteksi Sistem Operasi: $PRETTY_NAME"
 # Update system
 apt update -y && apt upgrade -y
 
-# ==============================
-#  Paket umum
-# ==============================
+# Paket umum
 apt install -y wget curl unzip tar socat cron net-tools dnsutils lsof jq bc \
     gnupg ca-certificates git figlet
 
 # Netcat (Debian 12 butuh pilih manual)
 apt install -y netcat-openbsd
 
-# ==============================
-#  Time Sync
-# ==============================
+# Time sync (chrony atau systemd-timesyncd)
 if apt install -y chrony; then
     systemctl enable chrony
     systemctl restart chrony
@@ -141,7 +136,50 @@ EOF
 fi
 
 echo -e "${green}[OK]${FONT} Base Installer selesai dipasang!"
+
 # ==============================
+#  Install & Enable VPN/Proxy Services
+# ==============================
+
+# OpenVPN
+if apt install -y openvpn easy-rsa; then
+    systemctl enable openvpn || true
+    systemctl enable openvpn-server@server || true
+    systemctl restart openvpn || true
+    echo -e "${OK} OpenVPN aktif"
+fi
+
+# HAProxy
+if apt install -y haproxy; then
+    systemctl enable haproxy
+    systemctl restart haproxy
+    echo -e "${OK} HAProxy aktif"
+fi
+
+# OHP (Open HTTP Puncher)
+if [ ! -f /usr/local/bin/ohpserver ]; then
+    wget -q -O /usr/local/bin/ohpserver https://github.com/lfasmpao/open-http-puncher/releases/download/0.1/ohpserver-linux-amd64
+    chmod +x /usr/local/bin/ohpserver
+fi
+
+cat > /etc/systemd/system/ohp.service <<EOF
+[Unit]
+Description=OHP Server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/ohpserver -port 8087 -proxy 127.0.0.1:3128 -tunnel 127.0.0.1:22
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable ohp
+systemctl restart ohp
+echo -e "${OK} OHP aktif"
+
 
 
 # ==============================
