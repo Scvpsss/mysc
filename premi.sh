@@ -17,7 +17,6 @@ GREENBG="\033[42;37m"
 REDBG="\033[41;37m"
 OK="${Green}--->${FONT}"
 ERROR="${RED}[ERROR]${FONT}"
-GRAY="\e[1;30m"
 NC='\e[0m'
 red='\e[1;31m'
 green='\e[0;32m'
@@ -39,10 +38,8 @@ echo -e "${YELLOW}----------------------------------------------------------${NC
 echo ""
 sleep 2
 
-###### IZIN SC 
-
 # ==============================
-#  UNIVERSAL BASE INSTALLER
+#  DETEKSI OS
 # ==============================
 if [ -f /etc/os-release ]; then
     . /etc/os-release
@@ -153,74 +150,24 @@ echo -e "${green}[INFO]${FONT} Mengecek status layanan VPN..."
 services=("ssh" "openvpn" "dropbear" "haproxy")
 
 for srv in "${services[@]}"; do
-    if systemctl is-active --quiet "$srv"; then
-        echo -e " │ Service ${srv^}                   = [ON]"
+    if systemctl list-unit-files | grep -q "${srv}.service"; then
+        if systemctl is-active --quiet "$srv"; then
+            echo -e " │ Service ${srv^}                   = [ON]"
+        else
+            echo -e " │ Service ${srv^}                   = [OFF]"
+        fi
     else
-        echo -e " │ Service ${srv^}                   = [OFF]"
+        echo -e " │ Service ${srv^}                   = [NOT INSTALLED]"
     fi
 done
 
-
-# ==============================
-#  Install & Enable VPN/Proxy Services
-# ==============================
-
-# OpenVPN
-if apt install -y openvpn easy-rsa; then
-    systemctl enable openvpn || true
-    systemctl enable openvpn-server@server || true
-    systemctl restart openvpn || true
-    echo -e "${OK} OpenVPN aktif"
-fi
-
-# HAProxy
-if apt install -y haproxy; then
-    systemctl enable haproxy
-    systemctl restart haproxy
-    echo -e "${OK} HAProxy aktif"
-fi
-
-# OHP (Open HTTP Puncher)
-if [ ! -f /usr/local/bin/ohpserver ]; then
-    wget -q -O /usr/local/bin/ohpserver https://github.com/lfasmpao/open-http-puncher/releases/download/0.1/ohpserver-linux-amd64
-    chmod +x /usr/local/bin/ohpserver
-fi
-
-cat > /etc/systemd/system/ohp.service <<EOF
-[Unit]
-Description=OHP Server
-After=network.target
-
-[Service]
-ExecStart=/usr/local/bin/ohpserver -port 8087 -proxy 127.0.0.1:3128 -tunnel 127.0.0.1:22
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable ohp
-systemctl restart ohp
-echo -e "${OK} OHP aktif"
-
-
-
-# ==============================
-# Aktifkan service
-# ==============================
-systemctl daemon-reload
-systemctl enable bayu-vpn
-systemctl start bayu-vpn
-
-echo -e "${Green}[OK]${FONT} Base Installer & Autostart service berhasil dipasang!"
-
-# // IP Address Validating
+# IP Address
 if [[ $IP == "" ]]; then
-    echo -e "${EROR} IP Address ( ${YELLOW}Not Detected${NC} )"
+    echo -e "${ERROR} IP Address ( ${YELLOW}Not Detected${NC} )"
 else
     echo -e "${OK} IP Address ( ${green}$IP${NC} )"
 fi
+
 
 # // Validate Successfull
 echo ""
