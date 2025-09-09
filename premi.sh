@@ -39,14 +39,94 @@ echo ""
 sleep 2
 ###### IZIN SC 
 
-if [[ $( cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g' ) == "ubuntu" ]]; then
-    echo -e "${OK} Your OS Is Supported ( ${green}$( cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g' )${NC} )"
-elif [[ $( cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g' ) == "debian" ]]; then
-    echo -e "${OK} Your OS Is Supported ( ${green}$( cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g' )${NC} )"
+# ==============================
+#  UNIVERSAL BASE INSTALLER
+# ==============================
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$ID
+    VER=$VERSION_ID
 else
-    echo -e "${EROR} Your OS Is Not Supported ( ${YELLOW}$( cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g' )${NC} )"
+    echo -e "${MERAH}[ERROR]${FONT} Tidak bisa mendeteksi OS!"
     exit 1
 fi
+
+echo -e "${HIJAU}[INFO]${FONT} Deteksi Sistem Operasi: $PRETTY_NAME"
+
+# Update system
+apt update -y && apt upgrade -y
+
+# Paket umum
+apt install -y wget curl unzip tar socat cron net-tools dnsutils lsof jq bc \
+    gnupg ca-certificates git
+
+# Cek Debian/Ubuntu
+case $OS in
+    debian|ubuntu)
+        if [[ "$OS" == "debian" ]]; then
+            if [[ "$VER" -ge 12 ]]; then
+                echo -e "${KUNING}[INFO]${FONT} Debian $VER terdeteksi, memakai iptables-nft"
+                apt install -y nftables iptables
+                update-alternatives --set iptables /usr/sbin/iptables-nft
+                update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
+                update-alternatives --set arptables /usr/sbin/arptables-nft
+                update-alternatives --set ebtables /usr/sbin/ebtables-nft
+            else
+                echo -e "${KUNING}[INFO]${FONT} Debian $VER terdeteksi, memakai iptables klasik"
+                apt install -y iptables
+            fi
+        elif [[ "$OS" == "ubuntu" ]]; then
+            if [[ "$VER" -ge 22 ]]; then
+                echo -e "${KUNING}[INFO]${FONT} Ubuntu $VER terdeteksi, memakai iptables-nft"
+                apt install -y nftables iptables
+                update-alternatives --set iptables /usr/sbin/iptables-nft
+                update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
+                update-alternatives --set arptables /usr/sbin/arptables-nft
+                update-alternatives --set ebtables /usr/sbin/ebtables-nft
+            else
+                echo -e "${KUNING}[INFO]${FONT} Ubuntu $VER terdeteksi, memakai iptables klasik"
+                apt install -y iptables
+            fi
+        fi
+        ;;
+    *)
+        echo -e "${MERAH}[ERROR]${FONT} OS $OS $VER belum didukung otomatis"
+        exit 1
+        ;;
+esac
+
+# Tambahan paket jaringan
+apt install -y net-tools iproute2
+
+# Pastikan rc.local ada
+if [ ! -f /etc/systemd/system/rc-local.service ]; then
+cat > /etc/systemd/system/rc-local.service <<EOF
+[Unit]
+Description=/etc/rc.local
+ConditionPathExists=/etc/rc.local
+
+[Service]
+Type=forking
+ExecStart=/etc/rc.local start
+TimeoutSec=0
+StandardOutput=tty
+RemainAfterExit=yes
+SysVStartPriority=99
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    cat > /etc/rc.local <<EOF
+#!/bin/bash
+exit 0
+EOF
+    chmod +x /etc/rc.local
+    systemctl enable rc-local
+fi
+
+echo -e "${HIJAU}[OK]${FONT} Base Installer selesai dipasang!"
+# ==============================
 
 # // IP Address Validating
 if [[ $IP == "" ]]; then
