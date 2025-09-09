@@ -13,20 +13,14 @@ RED="\033[31m"
 YELLOW="\033[33m"
 BLUE="\033[36m"
 FONT="\033[0m"
-GREENBG="\033[42;37m"
-REDBG="\033[41;37m"
 OK="${Green}--->${FONT}"
 ERROR="${RED}[ERROR]${FONT}"
 NC='\e[0m'
-red='\e[1;31m'
 green='\e[0;32m'
 
 # ===================
 clear
 export IP=$( curl -sS icanhazip.com )
-
-# Clear Data
-clear && clear && clear
 
 # Banner
 echo -e "${YELLOW}----------------------------------------------------------${NC}"
@@ -97,16 +91,16 @@ if apt install -y chrony >/dev/null 2>&1; then
         systemctl enable chrony
         systemctl restart chrony
         echo -e "${OK} Chrony aktif (chrony.service)"
-    elif systemctl list-unit-files | grep -q "chronyd.service"; then
-        systemctl enable chronyd
-        systemctl restart chronyd
-        echo -e "${OK} Chrony aktif (chronyd.service)"
     else
         timedatectl set-ntp true
+        systemctl enable systemd-timesyncd
+        systemctl restart systemd-timesyncd
         echo -e "${OK} Sinkronisasi waktu menggunakan systemd-timesyncd"
     fi
 else
     timedatectl set-ntp true
+    systemctl enable systemd-timesyncd
+    systemctl restart systemd-timesyncd
     echo -e "${OK} Sinkronisasi waktu menggunakan systemd-timesyncd"
 fi
 
@@ -167,6 +161,7 @@ if [[ $IP == "" ]]; then
 else
     echo -e "${OK} IP Address ( ${green}$IP${NC} )"
 fi
+
 
 
 # // Validate Successfull
