@@ -111,7 +111,8 @@ After=network.target
 Type=simple
 ExecStart=/bin/bash /usr/local/bin/bayu-start.sh
 Restart=always
-RestartSec=3
+RestartSec=5
+
 
 [Install]
 WantedBy=multi-user.target
@@ -122,17 +123,21 @@ EOF
 # ==============================
 cat > /usr/local/bin/bayu-start.sh <<'EOL'
 #!/bin/bash
-# Script otomatis setelah boot
+# /usr/local/bin/bayu-start.sh
 
-# Jalankan script izin (cek izin akses)
+# Jalankan izin
 if [ -f /root/mysc/izin ]; then
-    bash /root/mysc/izin
+    bash /root/mysc/izin
 fi
 
-# Jalankan script premi (layanan utama)
+# Jalankan premi
 if [ -f /root/mysc/premi.sh ]; then
-    bash /root/mysc/premi.sh
+    bash /root/mysc/premi.sh
 fi
+
+# Trik supaya service dianggap aktif
+tail -f /dev/null
+
 
 exit 0
 EOL
