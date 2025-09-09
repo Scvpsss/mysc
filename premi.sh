@@ -1,39 +1,36 @@
 #!/bin/bash
-### Color
-apt update -y
-apt upgrade -y
-apt install -y lolcat wondershaper figlet wget curl unzip tar socat cron \
-    net-tools dnsutils lsof jq bc gnupg ca-certificates git
-
-# Fix netcat
-apt install -y netcat-openbsd || apt install -y netcat-traditional
-
+### Warna
 Green="\e[92;1m"
 RED="\033[31m"
 YELLOW="\033[33m"
 BLUE="\033[36m"
 FONT="\033[0m"
+GREENBG="\033[42;37m"
+REDBG="\033[41;37m"
 OK="${Green}--->${FONT}"
 ERROR="${RED}[ERROR]${FONT}"
+GRAY="\e[1;30m"
 NC='\e[0m'
+red='\e[1;31m'
 green='\e[0;32m'
 
 # ===================
 clear
+# // Ambil IP
 export IP=$( curl -sS icanhazip.com )
 
 # Banner
 echo -e "${YELLOW}----------------------------------------------------------${NC}"
 echo -e "  Welcome To Bayu vpn Tunneling ${YELLOW}(${NC}${green} Stable Edition ${NC}${YELLOW})${NC}"
 echo -e " This Will Quick Setup VPN Server On Your Server"
-echo -e "  Author : ${green}Bayu vpn® ${NC}${YELLOW}(${NC} ${green} Bayu vpn Tunneling ${NC}${YELLOW})${NC}"
+echo -e "  Auther : ${green}Bayu vpn® ${NC}${YELLOW}(${NC} ${green} Bayu vpn Tunneling ${NC}${YELLOW})${NC}"
 echo -e " © Recode By My Self Bayu Tunneling${YELLOW}(${NC} 2023 ${YELLOW})${NC}"
 echo -e "${YELLOW}----------------------------------------------------------${NC}"
 echo ""
 sleep 2
 
 # ==============================
-#  DETEKSI OS
+#  UNIVERSAL BASE INSTALLER
 # ==============================
 if [ -f /etc/os-release ]; then
     . /etc/os-release
@@ -46,31 +43,38 @@ fi
 
 echo -e "${green}[INFO]${FONT} Deteksi Sistem Operasi: $PRETTY_NAME"
 
+# Update sistem
+apt update -y && apt upgrade -y
+
+# Paket umum
+apt install -y wget curl unzip tar socat cron net-tools dnsutils lsof jq bc \
+    gnupg ca-certificates git lolcat wondershaper figlet
+
 # Cek Debian/Ubuntu
 case $OS in
     debian|ubuntu)
         if [[ "$OS" == "debian" ]]; then
             if [[ "$VER" -ge 12 ]]; then
-                echo -e "${YELLOW}[INFO]${FONT} Debian $VER terdeteksi, memakai iptables-nft"
+                echo -e "${YELLOW}[INFO]${FONT} Debian $VER → iptables-nft"
                 apt install -y nftables iptables
                 update-alternatives --set iptables /usr/sbin/iptables-nft
                 update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
                 update-alternatives --set arptables /usr/sbin/arptables-nft
                 update-alternatives --set ebtables /usr/sbin/ebtables-nft
             else
-                echo -e "${YELLOW}[INFO]${FONT} Debian $VER terdeteksi, memakai iptables klasik"
+                echo -e "${YELLOW}[INFO]${FONT} Debian $VER → iptables klasik"
                 apt install -y iptables
             fi
         elif [[ "$OS" == "ubuntu" ]]; then
             if [[ "$VER" -ge 22 ]]; then
-                echo -e "${YELLOW}[INFO]${FONT} Ubuntu $VER terdeteksi, memakai iptables-nft"
+                echo -e "${YELLOW}[INFO]${FONT} Ubuntu $VER → iptables-nft"
                 apt install -y nftables iptables
                 update-alternatives --set iptables /usr/sbin/iptables-nft
                 update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
                 update-alternatives --set arptables /usr/sbin/arptables-nft
                 update-alternatives --set ebtables /usr/sbin/ebtables-nft
             else
-                echo -e "${YELLOW}[INFO]${FONT} Ubuntu $VER terdeteksi, memakai iptables klasik"
+                echo -e "${YELLOW}[INFO]${FONT} Ubuntu $VER → iptables klasik"
                 apt install -y iptables
             fi
         fi
@@ -81,32 +85,10 @@ case $OS in
         ;;
 esac
 
-# ==============================
-#  FIX CHRONY / TIMESYNC
-# ==============================
-echo -e "${green}[INFO]${FONT} Mengatur sinkronisasi waktu..."
+# Tambahan paket jaringan
+apt install -y net-tools iproute2
 
-if apt install -y chrony >/dev/null 2>&1; then
-    if systemctl list-unit-files | grep -q "chrony.service"; then
-        systemctl enable chrony
-        systemctl restart chrony
-        echo -e "${OK} Chrony aktif (chrony.service)"
-    else
-        timedatectl set-ntp true
-        systemctl enable systemd-timesyncd
-        systemctl restart systemd-timesyncd
-        echo -e "${OK} Sinkronisasi waktu menggunakan systemd-timesyncd"
-    fi
-else
-    timedatectl set-ntp true
-    systemctl enable systemd-timesyncd
-    systemctl restart systemd-timesyncd
-    echo -e "${OK} Sinkronisasi waktu menggunakan systemd-timesyncd"
-fi
-
-# ==============================
-#  Pastikan rc.local ada
-# ==============================
+# Pastikan rc.local ada
 if [ ! -f /etc/systemd/system/rc-local.service ]; then
 cat > /etc/systemd/system/rc-local.service <<EOF
 [Unit]
@@ -133,27 +115,45 @@ EOF
     systemctl enable rc-local
 fi
 
-echo -e "${green}[OK]${FONT} Base Installer selesai dipasang!"
-echo ""
+# ==============================
+# Sinkronisasi waktu (fix chronyd)
+# ==============================
+echo -e "${green}[INFO]${FONT} Mengatur sinkronisasi waktu..."
+
+apt install -y chrony
+
+# Matikan timesyncd kalau chrony dipakai
+systemctl stop systemd-timesyncd 2>/dev/null || true
+systemctl disable systemd-timesyncd 2>/dev/null || true
+
+if systemctl list-unit-files | grep -q "^chrony.service"; then
+    systemctl enable chrony.service
+    systemctl restart chrony.service
+    echo -e "${OK} Chrony aktif (chrony.service)"
+else
+    timedatectl set-ntp true
+    systemctl enable --now systemd-timesyncd
+    echo -e "${OK} Sinkronisasi waktu menggunakan systemd-timesyncd (fallback)"
+fi
+
+echo -e "${green}[INFO]${FONT} Verifikasi sinkronisasi waktu:"
+if systemctl is-active --quiet chrony; then
+    chronyc tracking | sed -n '1,5p' || true
+else
+    timedatectl status | sed -n '1,12p' || true
+fi
 
 # ==============================
-#  CEK SERVICE
+# Installer tambahan (opsional)
 # ==============================
-echo -e "${green}[INFO]${FONT} Mengecek status layanan VPN..."
+# Contoh untuk aktifkan haproxy, dropbear, openvpn
+  apt install -y haproxy dropbear openvpn easy-rsa
+  systemctl enable haproxy dropbear openvpn
+  systemctl restart haproxy dropbear openvpn
 
-services=("ssh" "openvpn" "dropbear" "haproxy")
+echo -e "${green}[OK]${FONT} Base Installer & Autostart service berhasil dipasang!"
+echo -e "${OK} IP Address ( ${green}$IP${NC} )"
 
-for srv in "${services[@]}"; do
-    if systemctl list-unit-files | grep -q "${srv}.service"; then
-        if systemctl is-active --quiet "$srv"; then
-            echo -e " │ Service ${srv^}                   = [ON]"
-        else
-            echo -e " │ Service ${srv^}                   = [OFF]"
-        fi
-    else
-        echo -e " │ Service ${srv^}                   = [NOT INSTALLED]"
-    fi
-done
 
 # IP Address
 if [[ $IP == "" ]]; then
