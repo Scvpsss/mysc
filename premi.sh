@@ -96,37 +96,57 @@ case $OS in
 esac
 
 # Tambahan paket jaringan
-apt install -y net-tools iproute2
 
-# Pastikan rc.local ada
-if [ ! -f /etc/systemd/system/rc-local.service ]; then
-cat > /etc/systemd/system/rc-local.service <<EOF
+# ==============================
+# Buat systemd service otomatis
+# ==============================
+echo -e "${green}[INFO]${FONT} Membuat systemd service untuk autostart..."
+
+cat > /etc/systemd/system/bayu-vpn.service <<EOF
 [Unit]
-Description=/etc/rc.local
-ConditionPathExists=/etc/rc.local
+Description=Bayu VPN Tunneling Autostart
+After=network.target
 
 [Service]
-Type=forking
-ExecStart=/etc/rc.local start
-TimeoutSec=0
-StandardOutput=tty
-RemainAfterExit=yes
-SysVStartPriority=99
+Type=simple
+ExecStart=/bin/bash /usr/local/bin/bayu-start.sh
+Restart=always
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-    cat > /etc/rc.local <<EOF
+# ==============================
+# Buat script start utama
+# ==============================
+cat > /usr/local/bin/bayu-start.sh <<'EOL'
 #!/bin/bash
-exit 0
-EOF
-    chmod +x /etc/rc.local
-    systemctl enable rc-local
+# Script otomatis setelah boot
+
+# Jalankan script izin (cek izin akses)
+if [ -f /root/mysc/izin ]; then
+    bash /root/mysc/izin
 fi
 
-echo -e "${HIJAU}[OK]${FONT} Base Installer selesai dipasang!"
+# Jalankan script premi (layanan utama)
+if [ -f /root/mysc/premi.sh ]; then
+    bash /root/mysc/premi.sh
+fi
+
+exit 0
+EOL
+
+chmod +x /usr/local/bin/bayu-start.sh
+
 # ==============================
+# Aktifkan service
+# ==============================
+systemctl daemon-reload
+systemctl enable bayu-vpn
+systemctl start bayu-vpn
+
+echo -e "${Green}[OK]${FONT} Base Installer & Autostart service berhasil dipasang!"
 
 # // IP Address Validating
 if [[ $IP == "" ]]; then
