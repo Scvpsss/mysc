@@ -1,9 +1,13 @@
 #!/bin/bash
 ### Color
-apt upgrade -y
 apt update -y
-apt install lolcat -y
-apt install wondershaper -y
+apt upgrade -y
+apt install -y lolcat wondershaper figlet wget curl unzip tar socat cron \
+    net-tools dnsutils lsof jq bc gnupg ca-certificates git
+
+# Fix netcat
+apt install -y netcat-openbsd || apt install -y netcat-traditional
+
 Green="\e[92;1m"
 RED="\033[31m"
 YELLOW="\033[33m"
@@ -20,22 +24,22 @@ green='\e[0;32m'
 
 # ===================
 clear
-# // Exporint IP AddressInformation
 export IP=$( curl -sS icanhazip.com )
 
-# // Clear Data
+# Clear Data
 clear && clear && clear
-clear;clear;clear
 
-# // Banner
+# Banner
 echo -e "${YELLOW}----------------------------------------------------------${NC}"
 echo -e "  Welcome To Bayu vpn Tunneling ${YELLOW}(${NC}${green} Stable Edition ${NC}${YELLOW})${NC}"
 echo -e " This Will Quick Setup VPN Server On Your Server"
-echo -e "  Auther : ${green}Bayu vpn® ${NC}${YELLOW}(${NC} ${green} Bayu vpn Tunneling ${NC}${YELLOW})${NC}"
+echo -e "  Author : ${green}Bayu vpn® ${NC}${YELLOW}(${NC} ${green} Bayu vpn Tunneling ${NC}${YELLOW})${NC}"
 echo -e " © Recode By My Self Bayu Tunneling${YELLOW}(${NC} 2023 ${YELLOW})${NC}"
 echo -e "${YELLOW}----------------------------------------------------------${NC}"
 echo ""
 sleep 2
+
+###### IZIN SC 
 
 # ==============================
 #  UNIVERSAL BASE INSTALLER
@@ -51,29 +55,7 @@ fi
 
 echo -e "${green}[INFO]${FONT} Deteksi Sistem Operasi: $PRETTY_NAME"
 
-# Update system
-apt update -y && apt upgrade -y
-
-# Paket umum
-apt install -y wget curl unzip tar socat cron net-tools dnsutils lsof jq bc \
-    gnupg ca-certificates git figlet
-
-# Netcat (Debian 12 butuh pilih manual)
-apt install -y netcat-openbsd
-
-# Time sync (chrony atau systemd-timesyncd)
-if apt install -y chrony; then
-    systemctl enable chrony
-    systemctl restart chrony
-    echo -e "${OK} Chrony terpasang dan dijalankan"
-else
-    timedatectl set-ntp true
-    echo -e "${OK} Menggunakan systemd-timesyncd untuk sinkronisasi waktu"
-fi
-
-# ==============================
-#  Cek Debian/Ubuntu dan iptables
-# ==============================
+# Cek Debian/Ubuntu
 case $OS in
     debian|ubuntu)
         if [[ "$OS" == "debian" ]]; then
@@ -108,7 +90,32 @@ case $OS in
         ;;
 esac
 
-# Pastikan rc.local ada
+# ==============================
+#  FIX CHRONY / TIMESYNC
+# ==============================
+echo -e "${green}[INFO]${FONT} Mengatur sinkronisasi waktu..."
+
+if apt install -y chrony >/dev/null 2>&1; then
+    if systemctl list-unit-files | grep -q "chrony.service"; then
+        systemctl enable chrony
+        systemctl restart chrony
+        echo -e "${OK} Chrony aktif (chrony.service)"
+    elif systemctl list-unit-files | grep -q "chronyd.service"; then
+        systemctl enable chronyd
+        systemctl restart chronyd
+        echo -e "${OK} Chrony aktif (chronyd.service)"
+    else
+        timedatectl set-ntp true
+        echo -e "${OK} Sinkronisasi waktu menggunakan systemd-timesyncd"
+    fi
+else
+    timedatectl set-ntp true
+    echo -e "${OK} Sinkronisasi waktu menggunakan systemd-timesyncd"
+fi
+
+# ==============================
+#  Pastikan rc.local ada
+# ==============================
 if [ ! -f /etc/systemd/system/rc-local.service ]; then
 cat > /etc/systemd/system/rc-local.service <<EOF
 [Unit]
@@ -136,6 +143,23 @@ EOF
 fi
 
 echo -e "${green}[OK]${FONT} Base Installer selesai dipasang!"
+echo ""
+
+# ==============================
+#  CEK SERVICE
+# ==============================
+echo -e "${green}[INFO]${FONT} Mengecek status layanan VPN..."
+
+services=("ssh" "openvpn" "dropbear" "haproxy")
+
+for srv in "${services[@]}"; do
+    if systemctl is-active --quiet "$srv"; then
+        echo -e " │ Service ${srv^}                   = [ON]"
+    else
+        echo -e " │ Service ${srv^}                   = [OFF]"
+    fi
+done
+
 
 # ==============================
 #  Install & Enable VPN/Proxy Services
