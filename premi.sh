@@ -20,15 +20,14 @@ green='\e[0;32m'
 
 # ===================
 clear
-  # // Exporint IP AddressInformation
+# // Exporint IP AddressInformation
 export IP=$( curl -sS icanhazip.com )
 
 # // Clear Data
-clear
 clear && clear && clear
 clear;clear;clear
 
-  # // Banner
+# // Banner
 echo -e "${YELLOW}----------------------------------------------------------${NC}"
 echo -e "  Welcome To Bayu vpn Tunneling ${YELLOW}(${NC}${green} Stable Edition ${NC}${YELLOW})${NC}"
 echo -e " This Will Quick Setup VPN Server On Your Server"
@@ -47,102 +46,103 @@ if [ -f /etc/os-release ]; then
     OS=$ID
     VER=$VERSION_ID
 else
-    echo -e "${MERAH}[ERROR]${FONT} Tidak bisa mendeteksi OS!"
+    echo -e "${RED}[ERROR]${FONT} Tidak bisa mendeteksi OS!"
     exit 1
 fi
 
-echo -e "${HIJAU}[INFO]${FONT} Deteksi Sistem Operasi: $PRETTY_NAME"
+echo -e "${green}[INFO]${FONT} Deteksi Sistem Operasi: $PRETTY_NAME"
 
 # Update system
 apt update -y && apt upgrade -y
 
-# Paket umum
+# ==============================
+#  Paket umum
+# ==============================
 apt install -y wget curl unzip tar socat cron net-tools dnsutils lsof jq bc \
-    gnupg ca-certificates git
+    gnupg ca-certificates git figlet
 
-# Cek Debian/Ubuntu
+# Netcat (Debian 12 butuh pilih manual)
+apt install -y netcat-openbsd
+
+# ==============================
+#  Time Sync
+# ==============================
+if apt install -y chrony; then
+    systemctl enable chrony
+    systemctl restart chrony
+    echo -e "${OK} Chrony terpasang dan dijalankan"
+else
+    timedatectl set-ntp true
+    echo -e "${OK} Menggunakan systemd-timesyncd untuk sinkronisasi waktu"
+fi
+
+# ==============================
+#  Cek Debian/Ubuntu dan iptables
+# ==============================
 case $OS in
     debian|ubuntu)
         if [[ "$OS" == "debian" ]]; then
             if [[ "$VER" -ge 12 ]]; then
-                echo -e "${KUNING}[INFO]${FONT} Debian $VER terdeteksi, memakai iptables-nft"
+                echo -e "${YELLOW}[INFO]${FONT} Debian $VER terdeteksi, memakai iptables-nft"
                 apt install -y nftables iptables
                 update-alternatives --set iptables /usr/sbin/iptables-nft
                 update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
                 update-alternatives --set arptables /usr/sbin/arptables-nft
                 update-alternatives --set ebtables /usr/sbin/ebtables-nft
             else
-                echo -e "${KUNING}[INFO]${FONT} Debian $VER terdeteksi, memakai iptables klasik"
+                echo -e "${YELLOW}[INFO]${FONT} Debian $VER terdeteksi, memakai iptables klasik"
                 apt install -y iptables
             fi
         elif [[ "$OS" == "ubuntu" ]]; then
             if [[ "$VER" -ge 22 ]]; then
-                echo -e "${KUNING}[INFO]${FONT} Ubuntu $VER terdeteksi, memakai iptables-nft"
+                echo -e "${YELLOW}[INFO]${FONT} Ubuntu $VER terdeteksi, memakai iptables-nft"
                 apt install -y nftables iptables
                 update-alternatives --set iptables /usr/sbin/iptables-nft
                 update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
                 update-alternatives --set arptables /usr/sbin/arptables-nft
                 update-alternatives --set ebtables /usr/sbin/ebtables-nft
             else
-                echo -e "${KUNING}[INFO]${FONT} Ubuntu $VER terdeteksi, memakai iptables klasik"
+                echo -e "${YELLOW}[INFO]${FONT} Ubuntu $VER terdeteksi, memakai iptables klasik"
                 apt install -y iptables
             fi
         fi
         ;;
     *)
-        echo -e "${MERAH}[ERROR]${FONT} OS $OS $VER belum didukung otomatis"
+        echo -e "${RED}[ERROR]${FONT} OS $OS $VER belum didukung otomatis"
         exit 1
         ;;
 esac
 
-# Tambahan paket jaringan
-
-# ==============================
-# Buat systemd service otomatis
-# ==============================
-echo -e "${green}[INFO]${FONT} Membuat systemd service untuk autostart..."
-
-cat > /etc/systemd/system/bayu-vpn.service <<EOF
+# Pastikan rc.local ada
+if [ ! -f /etc/systemd/system/rc-local.service ]; then
+cat > /etc/systemd/system/rc-local.service <<EOF
 [Unit]
-Description=Bayu VPN Tunneling Autostart
-After=network.target
+Description=/etc/rc.local
+ConditionPathExists=/etc/rc.local
 
 [Service]
-Type=simple
-ExecStart=/bin/bash /usr/local/bin/bayu-start.sh
-Restart=always
-RestartSec=5
-
+Type=forking
+ExecStart=/etc/rc.local start
+TimeoutSec=0
+StandardOutput=tty
+RemainAfterExit=yes
+SysVStartPriority=99
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# ==============================
-# Buat script start utama
-# ==============================
-cat > /usr/local/bin/bayu-start.sh <<'EOL'
+    cat > /etc/rc.local <<EOF
 #!/bin/bash
-# /usr/local/bin/bayu-start.sh
-
-# Jalankan izin
-if [ -f /root/mysc/izin ]; then
-    bash /root/mysc/izin
-fi
-
-# Jalankan premi
-if [ -f /root/mysc/premi.sh ]; then
-    bash /root/mysc/premi.sh
-fi
-
-# Trik supaya service dianggap aktif
-tail -f /dev/null
-
-
 exit 0
-EOL
+EOF
+    chmod +x /etc/rc.local
+    systemctl enable rc-local
+fi
 
-chmod +x /usr/local/bin/bayu-start.sh
+echo -e "${green}[OK]${FONT} Base Installer selesai dipasang!"
+# ==============================
+
 
 # ==============================
 # Aktifkan service
