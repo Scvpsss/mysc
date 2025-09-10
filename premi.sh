@@ -1,100 +1,157 @@
 #!/bin/bash
-### Color
-apt update -y
-apt upgrade -y
-apt install -y lolcat wondershaper curl wget net-tools sudo gnupg figlet
-
+### Warna
 Green="\e[92;1m"
 RED="\033[31m"
 YELLOW="\033[33m"
 BLUE="\033[36m"
 FONT="\033[0m"
+GREENBG="\033[42;37m"
+REDBG="\033[41;37m"
 OK="${Green}--->${FONT}"
 ERROR="${RED}[ERROR]${FONT}"
+GRAY="\e[1;30m"
 NC='\e[0m'
+red='\e[1;31m'
 green='\e[0;32m'
 
 # ===================
 clear
-export IP=$(curl -sS icanhazip.com)
+# // Ambil IP
+export IP=$( curl -sS icanhazip.com )
 
 # Banner
 echo -e "${YELLOW}----------------------------------------------------------${NC}"
 echo -e "  Welcome To Bayu vpn Tunneling ${YELLOW}(${NC}${green} Stable Edition ${NC}${YELLOW})${NC}"
-echo -e "  Auther : ${green}Bayu vpn® ${NC}"
-echo -e "  Recode By My Self Bayu Tunneling ${YELLOW}(2023)${NC}"
+echo -e " This Will Quick Setup VPN Server On Your Server"
+echo -e "  Auther : ${green}Bayu vpn® ${NC}${YELLOW}(${NC} ${green} Bayu vpn Tunneling ${NC}${YELLOW})${NC}"
+echo -e " © Recode By My Self Bayu Tunneling${YELLOW}(${NC} 2023 ${YELLOW})${NC}"
 echo -e "${YELLOW}----------------------------------------------------------${NC}"
 echo ""
 sleep 2
 
 # ==============================
-#  OS Detection
+#  UNIVERSAL BASE INSTALLER
 # ==============================
 if [ -f /etc/os-release ]; then
     . /etc/os-release
     OS=$ID
     VER=$VERSION_ID
 else
-    echo -e "${ERROR} Tidak bisa mendeteksi OS!"
+    echo -e "${RED}[ERROR]${FONT} Tidak bisa mendeteksi OS!"
     exit 1
 fi
-echo -e "${OK} Deteksi Sistem Operasi: $PRETTY_NAME"
 
-# ==============================
-#  Enable SSH
-# ==============================
-echo -e "${OK} Konfigurasi SSH..."
-sed -i 's/#\?PermitRootLogin .*/PermitRootLogin yes/' /etc/ssh/sshd_config
-sed -i 's/#\?PasswordAuthentication .*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-systemctl enable ssh
-systemctl restart ssh
+echo -e "${green}[INFO]${FONT} Deteksi Sistem Operasi: $PRETTY_NAME"
 
-# ==============================
-#  Enable Dropbear
-# ==============================
-echo -e "${OK} Install & aktifkan Dropbear..."
-apt install -y dropbear
-cat > /etc/default/dropbear <<EOF
-NO_START=0
-DROPBEAR_PORT=109
-DROPBEAR_EXTRA_ARGS="-p 143 -p 443"
-DROPBEAR_BANNER="/etc/issue.net"
-EOF
-systemctl enable dropbear
-systemctl restart dropbear
+# Update sistem
+apt update -y && apt upgrade -y
 
-# ==============================
-#  Enable TUN
-# ==============================
-echo -e "${OK} Enable TUN..."
-mkdir -p /dev/net
-if [ ! -c /dev/net/tun ]; then
-    mknod /dev/net/tun c 10 200
-    chmod 600 /dev/net/tun
-fi
+# Paket umum
+apt install -y wget curl unzip tar socat cron net-tools dnsutils lsof jq bc \
+    gnupg ca-certificates git lolcat wondershaper figlet
 
-cat > /etc/systemd/system/tun.service <<EOF
+# Cek Debian/Ubuntu
+case $OS in
+    debian|ubuntu)
+        if [[ "$OS" == "debian" ]]; then
+            if [[ "$VER" -ge 12 ]]; then
+                echo -e "${YELLOW}[INFO]${FONT} Debian $VER → iptables-nft"
+                apt install -y nftables iptables
+                update-alternatives --set iptables /usr/sbin/iptables-nft
+                update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
+                update-alternatives --set arptables /usr/sbin/arptables-nft
+                update-alternatives --set ebtables /usr/sbin/ebtables-nft
+            else
+                echo -e "${YELLOW}[INFO]${FONT} Debian $VER → iptables klasik"
+                apt install -y iptables
+            fi
+        elif [[ "$OS" == "ubuntu" ]]; then
+            if [[ "$VER" -ge 22 ]]; then
+                echo -e "${YELLOW}[INFO]${FONT} Ubuntu $VER → iptables-nft"
+                apt install -y nftables iptables
+                update-alternatives --set iptables /usr/sbin/iptables-nft
+                update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
+                update-alternatives --set arptables /usr/sbin/arptables-nft
+                update-alternatives --set ebtables /usr/sbin/ebtables-nft
+            else
+                echo -e "${YELLOW}[INFO]${FONT} Ubuntu $VER → iptables klasik"
+                apt install -y iptables
+            fi
+        fi
+        ;;
+    *)
+        echo -e "${RED}[ERROR]${FONT} OS $OS $VER belum didukung otomatis"
+        exit 1
+        ;;
+esac
+
+# Tambahan paket jaringan
+apt install -y net-tools iproute2
+
+# Pastikan rc.local ada
+if [ ! -f /etc/systemd/system/rc-local.service ]; then
+cat > /etc/systemd/system/rc-local.service <<EOF
 [Unit]
-Description=Enable TUN device
-After=network.target
+Description=/etc/rc.local
+ConditionPathExists=/etc/rc.local
 
 [Service]
-ExecStart=/bin/sh -c 'mkdir -p /dev/net && mknod /dev/net/tun c 10 200 || true; chmod 600 /dev/net/tun'
+Type=forking
+ExecStart=/etc/rc.local start
+TimeoutSec=0
+StandardOutput=tty
 RemainAfterExit=yes
-Type=oneshot
+SysVStartPriority=99
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
-systemctl enable tun
-systemctl start tun
+    cat > /etc/rc.local <<EOF
+#!/bin/bash
+exit 0
+EOF
+    chmod +x /etc/rc.local
+    systemctl enable rc-local
+fi
 
 # ==============================
-#  Info
+# Sinkronisasi waktu (fix chronyd)
 # ==============================
-echo -e "${OK} Base Installer & Autostart service berhasil dipasang!"
+echo -e "${green}[INFO]${FONT} Mengatur sinkronisasi waktu..."
+
+apt install -y chrony
+
+# Matikan timesyncd kalau chrony dipakai
+systemctl stop systemd-timesyncd 2>/dev/null || true
+systemctl disable systemd-timesyncd 2>/dev/null || true
+
+if systemctl list-unit-files | grep -q "^chrony.service"; then
+    systemctl enable chrony.service
+    systemctl restart chrony.service
+    echo -e "${OK} Chrony aktif (chrony.service)"
+else
+    timedatectl set-ntp true
+    systemctl enable --now systemd-timesyncd
+    echo -e "${OK} Sinkronisasi waktu menggunakan systemd-timesyncd (fallback)"
+fi
+
+echo -e "${green}[INFO]${FONT} Verifikasi sinkronisasi waktu:"
+if systemctl is-active --quiet chrony; then
+    chronyc tracking | sed -n '1,5p' || true
+else
+    timedatectl status | sed -n '1,12p' || true
+fi
+
+# ==============================
+# Installer tambahan (opsional)
+# ==============================
+# Contoh untuk aktifkan haproxy, dropbear, openvpn
+# apt install -y haproxy dropbear openvpn easy-rsa
+# systemctl enable haproxy dropbear openvpn
+# systemctl restart haproxy dropbear openvpn
+
+echo -e "${green}[OK]${FONT} Base Installer & Autostart service berhasil dipasang!"
 echo -e "${OK} IP Address ( ${green}$IP${NC} )"
 
 
