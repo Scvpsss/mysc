@@ -128,6 +128,90 @@ fi
 echo -e "${HIJAU}[OK]${FONT} Base Installer selesai dipasang!"
 # ==============================
 
+# ==============================
+# Fix SSH Config
+# ==============================
+echo -e "${green}[INFO]${FONT} Konfigurasi SSH..."
+sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+sed -i '/^#\?ListenAddress/d' /etc/ssh/sshd_config
+echo "ListenAddress 0.0.0.0" >> /etc/ssh/sshd_config
+echo "ListenAddress ::" >> /etc/ssh/sshd_config
+systemctl enable ssh
+systemctl restart ssh
+echo -e "${OK} OpenSSH dikonfigurasi ulang."
+
+# ==============================
+# Dropbear Config
+# ==============================
+echo -e "${green}[INFO]${FONT} Install & aktifkan Dropbear..."
+apt install -y dropbear
+cat > /etc/default/dropbear <<EOF
+NO_START=0
+DROPBEAR_PORT=109
+DROPBEAR_EXTRA_ARGS="-p 143 -p 443"
+DROPBEAR_BANNER="/etc/issue.net"
+EOF
+systemctl enable dropbear
+systemctl restart dropbear
+echo -e "${OK} Dropbear aktif di port 109, 143, 443."
+
+# ==============================
+# TUN Device
+# ==============================
+echo -e "${green}[INFO]${FONT} Mengaktifkan TUN device..."
+mkdir -p /dev/net
+if [ ! -c /dev/net/tun ]; then
+    mknod /dev/net/tun c 10 200
+    chmod 600 /dev/net/tun
+fi
+
+cat > /etc/systemd/system/tun.service <<EOF
+[Unit]
+Description=Enable TUN device
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'mkdir -p /dev/net && mknod /dev/net/tun c 10 200 || true; chmod 600 /dev/net/tun'
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable tun
+systemctl start tun
+echo -e "${OK} TUN device aktif."
+
+# ==============================
+# Chrony / Time Sync
+# ==============================
+echo -e "${green}[INFO]${FONT} Mengatur sinkronisasi waktu..."
+apt install -y chrony
+
+systemctl stop systemd-timesyncd 2>/dev/null || true
+systemctl disable systemd-timesyncd 2>/dev/null || true
+
+if systemctl list-unit-files | grep -q "^chrony.service"; then
+    systemctl enable chrony.service
+    systemctl restart chrony.service
+    echo -e "${OK} Chrony aktif (chrony.service)"
+else
+    timedatectl set-ntp true
+    systemctl enable --now systemd-timesyncd
+    echo -e "${OK} Sinkronisasi waktu menggunakan systemd-timesyncd (fallback)"
+fi
+
+echo -e "${green}[INFO]${FONT} Verifikasi sinkronisasi waktu:"
+if systemctl is-active --quiet chrony; then
+    chronyc tracking | sed -n '1,5p' || true
+else
+    timedatectl status | sed -n '1,12p' || true
+fi
+
+
 # // IP Address Validating
 if [[ $IP == "" ]]; then
     echo -e "${EROR} IP Address ( ${YELLOW}Not Detected${NC} )"
