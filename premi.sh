@@ -2,8 +2,10 @@
 ### Color
 apt upgrade -y
 apt update -y
+apt install -y
 apt install lolcat -y
 apt install wondershaper -y
+apt install wget -y
 Green="\e[92;1m"
 RED="\033[31m"
 YELLOW="\033[33m"
@@ -17,7 +19,14 @@ GRAY="\e[1;30m"
 NC='\e[0m'
 red='\e[1;31m'
 green='\e[0;32m'
+ISP=$(cat /etc/xray/isp)
+CITY=$(cat /etc/xray/city)
+ipsaya=$(wget -qO- /ipinfo.oi/ip)
 
+TIMES="10"
+CHATID="6648546911"
+KEY="6694391135:AAEpl43B6WqG6yND1WoIYYyJRn-AEgyVATc"
+URL="https://api.telegram.org/bot$KEY/sendMessage"
 # ===================
 clear
   # // Exporint IP AddressInformation
@@ -30,187 +39,32 @@ clear;clear;clear
 
   # // Banner
 echo -e "${YELLOW}----------------------------------------------------------${NC}"
-echo -e "  Welcome To Bayu vpn Tunneling ${YELLOW}(${NC}${green} Stable Edition ${NC}${YELLOW})${NC}"
+echo -e "  Welcome To SCRIPT BayuXD ${YELLOW}(${NC}${green} Stable Edition ${NC}${YELLOW})${NC}"
 echo -e " This Will Quick Setup VPN Server On Your Server"
-echo -e "  Auther : ${green}Bayu vpn® ${NC}${YELLOW}(${NC} ${green} Bayu vpn Tunneling ${NC}${YELLOW})${NC}"
-echo -e " © Recode By My Self Bayu Tunneling${YELLOW}(${NC} 2023 ${YELLOW})${NC}"
+echo -e "  Auther : ${green} BAYUXD ® ${NC}${YELLOW}(${NC} ${green} BAYU_XD ${NC}${YELLOW})${NC}"
+echo -e " © Recode By BAYUXD ${YELLOW}(${NC} 2024 ${YELLOW})${NC}"
 echo -e "${YELLOW}----------------------------------------------------------${NC}"
 echo ""
 sleep 2
 ###### IZIN SC 
 
-# ==============================
-#  UNIVERSAL BASE INSTALLER
-# ==============================
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    OS=$ID
-    VER=$VERSION_ID
+# // Checking Os Architecture
+if [[ $( uname -m | awk '{print $1}' ) == "x86_64" ]]; then
+    echo -e "${OK} Your Architecture Is Supported ( ${green}$( uname -m )${NC} )"
 else
-    echo -e "${MERAH}[ERROR]${FONT} Tidak bisa mendeteksi OS!"
+    echo -e "${EROR} Your Architecture Is Not Supported ( ${YELLOW}$( uname -m )${NC} )"
     exit 1
 fi
 
-echo -e "${HIJAU}[INFO]${FONT} Deteksi Sistem Operasi: $PRETTY_NAME"
-
-# Update system
-apt update -y && apt upgrade -y
-
-# Paket umum
-apt install -y wget curl unzip tar socat cron net-tools dnsutils lsof jq bc \
-    gnupg ca-certificates git
-
-# Cek Debian/Ubuntu
-case $OS in
-    debian|ubuntu)
-        if [[ "$OS" == "debian" ]]; then
-            if [[ "$VER" -ge 12 ]]; then
-                echo -e "${KUNING}[INFO]${FONT} Debian $VER terdeteksi, memakai iptables-nft"
-                apt install -y nftables iptables
-                update-alternatives --set iptables /usr/sbin/iptables-nft
-                update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
-                update-alternatives --set arptables /usr/sbin/arptables-nft
-                update-alternatives --set ebtables /usr/sbin/ebtables-nft
-            else
-                echo -e "${KUNING}[INFO]${FONT} Debian $VER terdeteksi, memakai iptables klasik"
-                apt install -y iptables
-            fi
-        elif [[ "$OS" == "ubuntu" ]]; then
-            if [[ "$VER" -ge 22 ]]; then
-                echo -e "${KUNING}[INFO]${FONT} Ubuntu $VER terdeteksi, memakai iptables-nft"
-                apt install -y nftables iptables
-                update-alternatives --set iptables /usr/sbin/iptables-nft
-                update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
-                update-alternatives --set arptables /usr/sbin/arptables-nft
-                update-alternatives --set ebtables /usr/sbin/ebtables-nft
-            else
-                echo -e "${KUNING}[INFO]${FONT} Ubuntu $VER terdeteksi, memakai iptables klasik"
-                apt install -y iptables
-            fi
-        fi
-        ;;
-    *)
-        echo -e "${MERAH}[ERROR]${FONT} OS $OS $VER belum didukung otomatis"
-        exit 1
-        ;;
-esac
-
-# Tambahan paket jaringan
-apt install -y net-tools iproute2
-
-# Pastikan rc.local ada
-if [ ! -f /etc/systemd/system/rc-local.service ]; then
-cat > /etc/systemd/system/rc-local.service <<EOF
-[Unit]
-Description=/etc/rc.local
-ConditionPathExists=/etc/rc.local
-
-[Service]
-Type=forking
-ExecStart=/etc/rc.local start
-TimeoutSec=0
-StandardOutput=tty
-RemainAfterExit=yes
-SysVStartPriority=99
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    cat > /etc/rc.local <<EOF
-#!/bin/bash
-exit 0
-EOF
-    chmod +x /etc/rc.local
-    systemctl enable rc-local
-fi
-
-echo -e "${HIJAU}[OK]${FONT} Base Installer selesai dipasang!"
-# ==============================
-
-# ==============================
-# Fix SSH Config
-# ==============================
-echo -e "${green}[INFO]${FONT} Konfigurasi SSH..."
-sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
-sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-sed -i '/^#\?ListenAddress/d' /etc/ssh/sshd_config
-echo "ListenAddress 0.0.0.0" >> /etc/ssh/sshd_config
-echo "ListenAddress ::" >> /etc/ssh/sshd_config
-systemctl enable ssh
-systemctl restart ssh
-echo -e "${OK} OpenSSH dikonfigurasi ulang."
-
-# ==============================
-# Dropbear Config
-# ==============================
-echo -e "${green}[INFO]${FONT} Install & aktifkan Dropbear..."
-apt install -y dropbear
-cat > /etc/default/dropbear <<EOF
-NO_START=0
-DROPBEAR_PORT=109
-DROPBEAR_EXTRA_ARGS="-p 143 -p 443"
-DROPBEAR_BANNER="/etc/issue.net"
-EOF
-systemctl enable dropbear
-systemctl restart dropbear
-echo -e "${OK} Dropbear aktif di port 109, 143, 443."
-
-# ==============================
-# TUN Device
-# ==============================
-echo -e "${green}[INFO]${FONT} Mengaktifkan TUN device..."
-mkdir -p /dev/net
-if [ ! -c /dev/net/tun ]; then
-    mknod /dev/net/tun c 10 200
-    chmod 600 /dev/net/tun
-fi
-
-cat > /etc/systemd/system/tun.service <<EOF
-[Unit]
-Description=Enable TUN device
-After=network.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/bin/sh -c 'mkdir -p /dev/net && mknod /dev/net/tun c 10 200 || true; chmod 600 /dev/net/tun'
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable tun
-systemctl start tun
-echo -e "${OK} TUN device aktif."
-
-# ==============================
-# Chrony / Time Sync
-# ==============================
-echo -e "${green}[INFO]${FONT} Mengatur sinkronisasi waktu..."
-apt install -y chrony
-
-systemctl stop systemd-timesyncd 2>/dev/null || true
-systemctl disable systemd-timesyncd 2>/dev/null || true
-
-if systemctl list-unit-files | grep -q "^chrony.service"; then
-    systemctl enable chrony.service
-    systemctl restart chrony.service
-    echo -e "${OK} Chrony aktif (chrony.service)"
+# // Checking System
+if [[ $( cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g' ) == "ubuntu" ]]; then
+    echo -e "${OK} Your OS Is Supported ( ${green}$( cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g' )${NC} )"
+elif [[ $( cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g' ) == "debian" ]]; then
+    echo -e "${OK} Your OS Is Supported ( ${green}$( cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g' )${NC} )"
 else
-    timedatectl set-ntp true
-    systemctl enable --now systemd-timesyncd
-    echo -e "${OK} Sinkronisasi waktu menggunakan systemd-timesyncd (fallback)"
+    echo -e "${EROR} Your OS Is Not Supported ( ${YELLOW}$( cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g' )${NC} )"
+    exit 1
 fi
-
-echo -e "${green}[INFO]${FONT} Verifikasi sinkronisasi waktu:"
-if systemctl is-active --quiet chrony; then
-    chronyc tracking | sed -n '1,5p' || true
-else
-    timedatectl status | sed -n '1,12p' || true
-fi
-
 
 # // IP Address Validating
 if [[ $IP == "" ]]; then
