@@ -10,19 +10,32 @@ cd /root
 rm -rf regis
 #install
 apt update && apt upgrade
-apt install python3 python3-pip git
+apt install python3 python3-pip git -y
+apt install python3-venv -y
+python3 -m venv /usr/bin/env-bot
 cd /usr/bin
-wget https://raw.githubusercontent.com/BayuXD-Tunnel/mysc/main/limit/bot.zip
+wget https://raw.githubusercontent.com/Scvpsss/mysc/main/limit/bot.zip
 unzip bot.zip
 mv bot/* /usr/bin
 chmod +x /usr/bin/*
 rm -rf bot.zip
 cd /root
-wget https://raw.githubusercontent.com/BayuXD-Tunnel/mysc/main/limit/regis.zip
+wget https://raw.githubusercontent.com/Scvpsss/mysc/main/limit/regis.zip
 unzip regis.zip
 rm -rf regis.zip
-pip3 install -r regis/requirements.txt
-pip3 install pillow
+
+source /etc/os-release
+OS="$ID $VERSION_ID"
+if [[ "$OS" == "debian 12" || "$OS" == "ubuntu 24.04" || "$OS" == "ubuntu 24.10" || "$OS" == "ubuntu 25.04" ]]; then
+    running="/usr/bin/env-bot/bin"
+    ${running}/pip3 install -r regis/requirements.txt
+    pip3 install pillow
+else
+    running="/usr/bin"
+    pip3 install -r regis/requirements.txt
+    pip3 install pillow
+fi
+
 
 #isi data
 echo ""
@@ -50,7 +63,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/root
-ExecStart=/usr/bin/python3 -m regis
+ExecStart=${running}/python3 -m regis
 Restart=always
 
 [Install]
