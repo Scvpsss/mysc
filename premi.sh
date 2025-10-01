@@ -1,11 +1,29 @@
 #!/bin/bash
-### Color
-apt upgrade -y
+export TERM=xterm
+export DEBIAN_FRONTEND=noninteractive
+dpkg-reconfigure debconf -f noninteractive 2>/dev/null
+
+rm -f $0
+
 apt update -y
-apt install -y
+apt upgrade -y
+apt install git -y
+apt install at -y
+apt install curl -y
+apt install wget -y
+apt install jq -y
 apt install lolcat -y
-apt install wondershaper -y
-apt install wget curl -y
+apt install gem -y
+gem install lolcat -y
+apt install dos2unix -y
+apt install python -y
+apt install python3 -y
+apt install socat -y
+apt install netcat -y
+# buat ubuntu 22 dan 25 
+apt install netcat-traditional -y
+apt install netcat-openbsd -y
+
 Green="\e[92;1m"
 RED="\033[31m"
 YELLOW="\033[33m"
@@ -249,7 +267,7 @@ apt install zip pwgen openssl netcat socat cron bash-completion -y
 apt install haproxy -y
 echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
 echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
-sudo DEBIAN_FRONTEND=noninteractive apt-get -y install nginx iptables iptables-persistent netfilter-persistent libxml-parser-perl squid screen curl jq bzip2 gzip coreutils zip unzip rsyslog net-tools sed bc apt-transport-https build-essential dirmngr libxml-parser-perl lsof openvpn easy-rsa fail2ban tmux squid dropbear socat cron bash-completion ntpdate xz-utils apt-transport-https chrony pkg-config bison make git speedtest-cli p7zip-full zlib1g-dev python-is-python3 python3-pip build-essential squid libcurl4-openssl-dev bsdmainutils figlet
+sudo DEBIAN_FRONTEND=noninteractive apt-get -y install nginx iptables iptables-persistent netfilter-persistent libxml-parser-perl squid screen curl jq bzip2 gzip coreutils zip unzip rsyslog net-tools sed bc apt-transport-https build-essential dirmngr libxml-parser-perl lsof openvpn easy-rsa fail2ban tmux squid socat cron bash-completion ntpdate xz-utils apt-transport-https chrony pkg-config bison make git speedtest-cli p7zip-full zlib1g-dev python-is-python3 python3-pip build-essential squid libcurl4-openssl-dev bsdmainutils figlet
 sudo apt-get autoclean -y >/dev/null 2>&1
 audo apt-get -y --purge removd unscd >/dev/null 2>&1
 sudo apt-get -y --purge remove samba* >/dev/null 2>&1
@@ -1104,7 +1122,58 @@ function ins_dropbear(){
 clear
 print_install "Menginstall Dropbear"
 # // Installing Dropbear
-apt-get install dropbear -y > /dev/null 2>&1
+# Oleh: (LT) Lunatic Tunneling
+
+clear
+echo "[1] Menghapus dropbear versi lama..."
+pkill dropbear > /dev/null 2>&1
+rm -f /usr/sbin/dropbear
+rm -f /usr/local/sbin/dropbear
+rm -f /usr/local/bin/dropbear
+rm -f /usr/bin/dropbear
+rm -rf ~/dropbear-*
+
+echo "[2] Install dependensi..."
+apt update -y
+apt install -y build-essential zlib1g-dev wget
+
+echo "[3] Download Dropbear 2019.78..."
+cd ~
+wget -q https://matt.ucc.asn.au/dropbear/releases/dropbear-2019.78.tar.bz2
+
+echo "[4] Extract file..."
+tar -xjf dropbear-2019.78.tar.bz2
+cd dropbear-2019.78
+
+echo "[5] Konfigurasi dan compile..."
+./configure > /dev/null
+make PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" > /dev/null
+
+echo "[6] Menyalin binary ke /usr/sbin..."
+cp dropbear /usr/sbin/
+chmod +x /usr/sbin/dropbear
+
+echo "[7] Mengecek versi dropbear..."
+/usr/sbin/dropbear -V
+
+echo -e "\n[✓] Dropbear versi 2019.78 berhasil diinstall di /usr/sbin/dropbear"
+
+
+chmod 755 /usr/sbin/dropbear
+systemctl restart dropbear
+
+rm -rf dropbear-2019.78
+rm -rf dropbear-2019.78.tar.bz2
+
+
+    # Pastikan file bisa dieksekusi
+    chmod +x /etc/default/dropbear
+    chmod 600 /etc/default/dropbear
+    
+    chmod 755 /usr/sbin/dropbear
+    # Restart Dropbear dan tampilkan status
+    /etc/init.d/dropbear restart
+    
 wget -q -O /etc/default/dropbear "${REPO}limit/dropbear.conf"
 chmod +x /etc/default/dropbear
 /etc/init.d/dropbear restart
@@ -2223,8 +2292,59 @@ clear
 function ins_dropbear(){
 clear
 print_install "Menginstall Dropbear"
-# // Installing Dropbear
-apt-get install dropbear -y > /dev/null 2>&1
+#!/bin/bash
+# Auto Install Dropbear 2019.78 to /usr/sbin/dropbear
+# Oleh: (LT) Lunatic Tunneling
+
+clear
+echo "[1] Menghapus dropbear versi lama..."
+pkill dropbear > /dev/null 2>&1
+rm -f /usr/sbin/dropbear
+rm -f /usr/local/sbin/dropbear
+rm -f /usr/local/bin/dropbear
+rm -f /usr/bin/dropbear
+rm -rf ~/dropbear-*
+
+echo "[2] Install dependensi..."
+apt update -y
+apt install -y build-essential zlib1g-dev wget
+
+echo "[3] Download Dropbear 2019.78..."
+cd ~
+wget -q https://matt.ucc.asn.au/dropbear/releases/dropbear-2019.78.tar.bz2
+
+echo "[4] Extract file..."
+tar -xjf dropbear-2019.78.tar.bz2
+cd dropbear-2019.78
+
+echo "[5] Konfigurasi dan compile..."
+./configure > /dev/null
+make PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" > /dev/null
+
+echo "[6] Menyalin binary ke /usr/sbin..."
+cp dropbear /usr/sbin/
+chmod +x /usr/sbin/dropbear
+
+echo "[7] Mengecek versi dropbear..."
+/usr/sbin/dropbear -V
+
+echo -e "\n[✓] Dropbear versi 2019.78 berhasil diinstall di /usr/sbin/dropbear"
+
+
+chmod 755 /usr/sbin/dropbear
+systemctl restart dropbear
+
+rm -rf dropbear-2019.78
+rm -rf dropbear-2019.78.tar.bz2
+
+    # Pastikan file bisa dieksekusi
+    chmod +x /etc/default/dropbear
+    chmod 600 /etc/default/dropbear
+    
+    chmod 755 /usr/sbin/dropbear
+    # Restart Dropbear dan tampilkan status
+    /etc/init.d/dropbear restart
+    
 wget -q -O /etc/default/dropbear "${REPO}limit/dropbear.conf"
 chmod +x /etc/default/dropbear
 /etc/init.d/dropbear restart
@@ -3257,9 +3377,59 @@ print_success "SSHD"
 clear
 function ins_dropbear(){
 clear
-print_install "Menginstall Dropbear"
-# // Installing Dropbear
-apt-get install dropbear -y > /dev/null 2>&1
+#!/bin/bash
+# Auto Install Dropbear 2019.78 to /usr/sbin/dropbear
+# Oleh: (LT) Lunatic Tunneling
+
+clear
+echo "[1] Menghapus dropbear versi lama..."
+pkill dropbear > /dev/null 2>&1
+rm -f /usr/sbin/dropbear
+rm -f /usr/local/sbin/dropbear
+rm -f /usr/local/bin/dropbear
+rm -f /usr/bin/dropbear
+rm -rf ~/dropbear-*
+
+echo "[2] Install dependensi..."
+apt update -y
+apt install -y build-essential zlib1g-dev wget
+
+echo "[3] Download Dropbear 2019.78..."
+cd ~
+wget -q https://matt.ucc.asn.au/dropbear/releases/dropbear-2019.78.tar.bz2
+
+echo "[4] Extract file..."
+tar -xjf dropbear-2019.78.tar.bz2
+cd dropbear-2019.78
+
+echo "[5] Konfigurasi dan compile..."
+./configure > /dev/null
+make PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" > /dev/null
+
+echo "[6] Menyalin binary ke /usr/sbin..."
+cp dropbear /usr/sbin/
+chmod +x /usr/sbin/dropbear
+
+echo "[7] Mengecek versi dropbear..."
+/usr/sbin/dropbear -V
+
+echo -e "\n[✓] Dropbear versi 2019.78 berhasil diinstall di /usr/sbin/dropbear"
+
+
+chmod 755 /usr/sbin/dropbear
+systemctl restart dropbear
+
+rm -rf dropbear-2019.78
+rm -rf dropbear-2019.78.tar.bz2
+
+    # Pastikan file bisa dieksekusi
+    chmod +x /etc/default/dropbear
+    chmod 600 /etc/default/dropbear
+    
+    chmod 755 /usr/sbin/dropbear
+    # Restart Dropbear dan tampilkan status
+    /etc/init.d/dropbear restart
+    
 wget -q -O /etc/default/dropbear "${REPO}limit/dropbear.conf"
 chmod +x /etc/default/dropbear
 /etc/init.d/dropbear restart
