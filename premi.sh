@@ -2297,78 +2297,60 @@ print_install "Menginstall Dropbear"
 # Oleh: (LT) Lunatic Tunneling
 
 clear
-ins_dropbear() {
-  set -e
+echo "[1] Menghapus dropbear versi lama..."
+pkill dropbear > /dev/null 2>&1
+rm -f /usr/sbin/dropbear
+rm -f /usr/local/sbin/dropbear
+rm -f /usr/local/bin/dropbear
+rm -f /usr/bin/dropbear
+rm -rf ~/dropbear-*
 
-  echo "[0] Prasyarat..."
-  command -v systemctl >/dev/null || { echo "Butuh systemd environment."; }
-  apt update -y
-  apt install -y build-essential zlib1g-dev libpam0g-dev wget tar ca-certificates
+echo "[2] Install dependensi..."
+apt update -y
+apt install -y build-essential zlib1g-dev wget
 
-  echo "[1] Bersih-bersih instalasi lama..."
-  pkill dropbear >/dev/null 2>&1 || true
-  rm -f /usr/sbin/dropbear /usr/local/sbin/dropbear /usr/local/bin/dropbear /usr/bin/dropbear || true
-  rm -rf ~/dropbear-* /tmp/dropbear-build
+echo "[3] Download Dropbear 2019.78..."
+cd ~
+wget -q https://matt.ucc.asn.au/dropbear/releases/dropbear-2019.78.tar.bz2
 
-  echo "[2] Unduh source (2019.78 sesuai skrip awal kamu)..."
-  mkdir -p /tmp/dropbear-build && cd /tmp/dropbear-build
-  wget -q https://matt.ucc.asn.au/dropbear/releases/dropbear-2019.78.tar.bz2
-  tar -xjf dropbear-2019.78.tar.bz2
-  cd dropbear-2019.78
+echo "[4] Extract file..."
+tar -xjf dropbear-2019.78.tar.bz2
+cd dropbear-2019.78
 
-  echo "[3] Configure & compile..."
-  ./configure --disable-lastlog --disable-utmp --disable-utmpx --disable-wtmp --disable-wtmpx >/dev/null
-  make PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" >/dev/null
+echo "[5] Konfigurasi dan compile..."
+./configure > /dev/null
+make PROGRAMS="dropbear dbclient dropbearkey dropbearconvert scp" > /dev/null
 
-  echo "[4] Pasang binary..."
-  install -m 755 dropbear /usr/sbin/dropbear
-  install -m 755 dbclient /usr/bin/dbclient
-  install -m 755 dropbearkey /usr/bin/dropbearkey
-  install -m 755 scp /usr/bin/scp || true  # scp opsional bila bentrok dengan OpenSSH scp
+echo "[6] Menyalin binary ke /usr/sbin..."
+cp dropbear /usr/sbin/
+chmod +x /usr/sbin/dropbear
 
-  echo "[5] Host keys..."
-  mkdir -p /etc/dropbear
-  [ -f /etc/dropbear/dropbear_rsa_host_key ] || dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key >/dev/null
-  [ -f /etc/dropbear/dropbear_ecdsa_host_key ] || dropbearkey -t ecdsa -f /etc/dropbear/dropbear_ecdsa_host_key >/dev/null
-  [ -f /etc/dropbear/dropbear_ed25519_host_key ] || dropbearkey -t ed25519 -f /etc/dropbear/dropbear_ed25519_host_key >/dev/null
-  chmod 600 /etc/dropbear/dropbear_*_host_key
+echo "[7] Mengecek versi dropbear..."
+/usr/sbin/dropbear -V
 
-  echo "[6] Unit systemd..."
-  cat >/etc/systemd/system/dropbear.service <<'UNIT'
-[Unit]
-Description=Dropbear SSH server
-After=network.target
+echo -e "\n[✓] Dropbear versi 2019.78 berhasil diinstall di /usr/sbin/dropbear"
 
-[Service]
-ExecStart=/usr/sbin/dropbear -F -E -p 22 -w
-ExecReload=/bin/kill -HUP $MAINPID
-Restart=on-failure
-RestartSec=2s
-# Pastikan key directory
-Environment=DROPBEAR_KEY_DIR=/etc/dropbear
 
-[Install]
-WantedBy=multi-user.target
-UNIT
+chmod 755 /usr/sbin/dropbear
+systemctl restart dropbear
 
-  echo "[7] (Opsional) /etc/default/dropbear untuk port/arg mudah diubah..."
-  cat >/etc/default/dropbear <<'DEF'
-# Service helper (tidak wajib, tapi enak buat override cepat)
-NO_START=0
-DROPBEAR_PORT=22
-DROPBEAR_EXTRA_ARGS="-w"
-DEF
-  chmod 644 /etc/default/dropbear
+rm -rf dropbear-2019.78
+rm -rf dropbear-2019.78.tar.bz2
 
-  echo "[8] Reload systemd & start..."
-  systemctl daemon-reload
-  systemctl enable --now dropbear
-
-  echo "[9] Verifikasi..."
-  /usr/sbin/dropbear -V || true
-  systemctl status dropbear --no-pager
+    # Pastikan file bisa dieksekusi
+    chmod +x /etc/default/dropbear
+    chmod 600 /etc/default/dropbear
+    
+    chmod 755 /usr/sbin/dropbear
+    # Restart Dropbear dan tampilkan status
+    /etc/init.d/dropbear restart
+    
+wget -q -O /etc/default/dropbear "${REPO}limit/dropbear.conf"
+chmod +x /etc/default/dropbear
+/etc/init.d/dropbear restart
+/etc/init.d/dropbear status
+print_success "Dropbear"
 }
-
 
 clear
 function ins_vnstat(){
